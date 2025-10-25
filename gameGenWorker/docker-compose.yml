@@ -1,0 +1,33 @@
+services:
+  gamegen-worker:
+    build: .
+    container_name: matequest-gamegen-worker
+    restart: unless-stopped
+    environment:
+      # Appwrite configuration
+      - APPWRITE_ENDPOINT=${APPWRITE_ENDPOINT}
+      - APPWRITE_PROJECT_ID=${APPWRITE_PROJECT_ID}
+      - APPWRITE_API_KEY=${APPWRITE_API_KEY}
+      - DATABASE_GAMES_ID=${DATABASE_GAMES_ID}
+      - COLLECTION_PGN_ID=${COLLECTION_PGN_ID}
+      # Optional: Override Stockfish path if needed
+      - STOCKFISH_PATH=/usr/bin/stockfish
+    volumes:
+      # Optional: Mount logs directory for persistent logging
+      - ./logs:/app/logs
+    # Resource limits (adjust as needed)
+    deploy:
+      resources:
+        limits:
+          cpus: '0.8'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    # Health check
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

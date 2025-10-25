@@ -1,1 +1,4 @@
 appwrite
+Stockfish
+chess
+python-dotenv
