@@ -1,7 +1,8 @@
-import { Client, Databases, Query } from 'node-appwrite';
+import { Client, Databases, Query, ID } from 'node-appwrite';
 
 const PGN_COLLECTION_ID = process.env.APPWRITE_FUNCTION_PGN_COLLECTION_ID;
 const DATABASE_ID = process.env.APPWRITE_FUNCTION_GAMES_DATABASE_ID;
+const STATS_COLLECTION_ID = 'stats'
 
 // This Appwrite function will be executed every time your function is triggered
 export default async ({ req, res, log, error }) => {
@@ -89,6 +90,20 @@ export default async ({ req, res, log, error }) => {
     const computedTotal = m3 + m6 + m9 + m12 + m15;
 
     log(`Stats total(computed)=${computedTotal} m3=${m3} m6=${m6} m9=${m9} m12=${m12} m15=${m15}`);
+
+    // Persist to stats collection (single document)
+    try {
+      const statsList = await databases.listDocuments(DATABASE_ID, STATS_COLLECTION_ID, [Query.limit(1)]);
+      const payload = { total: computedTotal, m3, m6, m9, m12, m15 };
+      if (Array.isArray(statsList?.documents) && statsList.documents.length > 0) {
+        const docId = statsList.documents[0].$id;
+        await databases.updateDocument(DATABASE_ID, STATS_COLLECTION_ID, docId, payload);
+      } else {
+        await databases.createDocument(DATABASE_ID, STATS_COLLECTION_ID, ID.unique(), payload);
+      }
+    } catch (persistErr) {
+      error('Failed to persist stats: ' + (persistErr?.message || String(persistErr)));
+    }
 
     return res.json({ total: computedTotal, buckets: { m3, m6, m9, m12, m15 } });
   } catch (err) {
