@@ -4,7 +4,8 @@ import { useRef , useState, useMemo, useEffect} from 'react';
 import { Chess , type Square} from 'chess.js';
 import { Chessboard, type PieceDropHandlerArgs, type SquareHandlerArgs} from 'react-chessboard';
 import Engine from '@/lib/engine';
-import { getAppwriteAccount } from '@/lib/appwrite';
+import { getAppwriteAccount, getAppwriteDatabases } from '@/lib/appwrite';
+import { Query } from 'appwrite';
 
 export default function ChessboardComp({ matein }: { matein: 'm3' | 'm6' | 'm9' | 'm12' | 'm15' }) {
 
@@ -28,26 +29,99 @@ const [playerToMate, setPlayerToMate] = useState<'white' | 'black' | ''>('');
 // Explicit sides for clarity
 const [humanColor, setHumanColor] = useState<'w' | 'b'>('w');
 const [computerColor, setComputerColor] = useState<'w' | 'b'>('b');
+// Refs to avoid stale state in engine callbacks
+const currentMoveRef = useRef<'human' | 'computer'>('human');
+const computerColorRef = useRef<'w' | 'b'>('b');
 // Turn controller: whose move conceptually (independent of board turn color)
 const [currentMove, setCurrentMove] = useState<'human' | 'computer'>('human');
+// keep refs in sync with state
+useEffect(() => { currentMoveRef.current = currentMove; }, [currentMove]);
+useEffect(() => { computerColorRef.current = computerColor; }, [computerColor]);
 // Estimated eval from API (e.g., mate in number)
 const [estimatedEval, setEstimatedEval] = useState<string>('');
 // Auth state (for Solved box display)
 const [isAuthenticated, setIsAuthenticated] = useState(false);
+const [userEmail, setUserEmail] = useState<string>('');
+const [solvedCount, setSolvedCount] = useState<number>(0);
+const profileDocIdRef = useRef<string>('');
+const practiceObjRef = useRef<Record<'m3' | 'm6' | 'm9' | 'm12' | 'm15', number>>({ m3: 0, m6: 0, m9: 0, m12: 0, m15: 0 });
+const PROFILE_COLLECTION_ID = 'profiles';
 
+// auth + profile load
 useEffect(() => {
   let isMounted = true;
   (async () => {
     try {
       const account = getAppwriteAccount();
-      await account.get();
-      if (isMounted) setIsAuthenticated(true);
+      const me = await account.get();
+      if (!isMounted) return;
+      setIsAuthenticated(true);
+      const email = (me as any)?.email ?? '';
+      setUserEmail(email);
+
+      // fetch profile doc
+      try {
+        const databases = getAppwriteDatabases();
+        const dbId = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID as string;
+        // Prefer server-side filtering if available in client SDK
+        const res: any = await databases.listDocuments(dbId, PROFILE_COLLECTION_ID, [Query.equal('email', email), Query.limit(1)]);
+        const doc = Array.isArray(res?.documents) && res.documents.length > 0 ? res.documents[0] : null;
+        if (doc) {
+          profileDocIdRef.current = doc.$id as string;
+          // parse practice json string
+          const raw = doc.practice as string | undefined;
+          let parsed: any = { m3: 0, m6: 0, m9: 0, m12: 0, m15: 0 };
+          if (raw && typeof raw === 'string') {
+            try {
+              parsed = JSON.parse(raw);
+            } catch {
+              try {
+                const fixed = raw.replace(/([,{]\s*)(m3|m6|m9|m12|m15)(\s*:)/g, '$1"$2"$3');
+                parsed = JSON.parse(fixed);
+              } catch {
+                parsed = { m3: 0, m6: 0, m9: 0, m12: 0, m15: 0 };
+              }
+            }
+          }
+          practiceObjRef.current = {
+            m3: Number(parsed?.m3 ?? 0),
+            m6: Number(parsed?.m6 ?? 0),
+            m9: Number(parsed?.m9 ?? 0),
+            m12: Number(parsed?.m12 ?? 0),
+            m15: Number(parsed?.m15 ?? 0)
+          };
+          // set current solved count for this mate bucket
+          setSolvedCount(practiceObjRef.current[matein]);
+        }
+      } catch {
+        // ignore profile load errors
+      }
     } catch {
       if (isMounted) setIsAuthenticated(false);
     }
   })();
   return () => { isMounted = false; };
+// eslint-disable-next-line react-hooks/exhaustive-deps
 }, []);
+
+// helper to persist increment when puzzle is solved by human
+async function persistSolvedIncrement() {
+  try {
+    if (!isAuthenticated) return;
+    if (!profileDocIdRef.current) return;
+    const databases = getAppwriteDatabases();
+    const dbId = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID as string;
+    // increment in-memory
+    const nextVal = (practiceObjRef.current[matein] ?? 0) + 1;
+    practiceObjRef.current = { ...practiceObjRef.current, [matein]: nextVal } as typeof practiceObjRef.current;
+    setSolvedCount(nextVal);
+    const practiceString = JSON.stringify(practiceObjRef.current);
+    const practiceTotal = Object.values(practiceObjRef.current).reduce((sum, val) => sum + val, 0);
+    await databases.updateDocument(dbId, PROFILE_COLLECTION_ID, profileDocIdRef.current, { practice: practiceString, practice_total: practiceTotal });
+  } catch {
+    // ignore update errors for now
+  }
+}
 
 // Keep track of the baseline position to support true resets without re-fetching
 const initialPositionRef = useRef<{ fen: string; player: 'white' | 'black' | ''; estimated?: string }>({
@@ -111,8 +185,8 @@ useEffect(() => {
 function makeBestMove() {
   if (chessGame.isGameOver() || chessGame.isDraw()) return;
   // Only play when it's actually computer's turn on board and controller allows
-  if (currentMove !== 'computer') return;
-  if (chessGame.turn() !== computerColor) return;
+  if (currentMoveRef.current !== 'computer') return;
+  if (chessGame.turn() !== computerColorRef.current) return;
   try { engine.stop(); } catch {}
   const effectiveDepth = Math.max(15, searchDepth);
   engine.evaluatePosition(chessGame.fen(), effectiveDepth);
@@ -123,18 +197,19 @@ function makeBestMove() {
     if (typeof pv !== 'undefined') setBestLine(pv);
     if (bestMove) {
       // Guard against race
-      if (currentMove !== 'computer' || chessGame.turn() !== computerColor) return;
+      if (currentMoveRef.current !== 'computer' || chessGame.turn() !== computerColorRef.current) return;
       const from = bestMove.slice(0, 2) as Square;
       const to = bestMove.slice(2, 4) as Square;
       // Extra safety: ensure the piece at 'from' belongs to the computer side
       const pieceAtFrom = chessGame.get(from);
-      if (!pieceAtFrom || pieceAtFrom.color !== computerColor) return;
+      if (!pieceAtFrom || pieceAtFrom.color !== computerColorRef.current) return;
       try {
         chessGame.move({ from, to, promotion: 'q' });
         setChessPosition(chessGame.fen());
         try { engine.stop(); } catch {}
         // Hand turn back to human
         setCurrentMove('human');
+        currentMoveRef.current = 'human';
       } catch {
         // ignore illegal bestmove
       }
@@ -264,8 +339,14 @@ function onSquareClick({
   // update the position state
   setChessPosition(chessGame.fen());
 
+  // if human just delivered mate, persist increment
+  if (chessGame.isCheckmate()) {
+    void persistSolvedIncrement();
+  }
+
   // user moved; now it's computer's turn according to controller
   setCurrentMove('computer');
+  currentMoveRef.current = 'computer';
 
   // clear moveFrom and optionSquares
   setMoveFrom('');
@@ -293,8 +374,14 @@ function onPieceDrop({
     // update the position state upon successful move to trigger a re-render of the chessboard
     setChessPosition(chessGame.fen());
 
+    // if human just delivered mate, persist increment
+    if (chessGame.isCheckmate()) {
+      void persistSolvedIncrement();
+    }
+
     // user moved; now it's computer's turn according to controller
-    setCurrentMove('computer');
+  setCurrentMove('computer');
+  currentMoveRef.current = 'computer';
 
     // clear moveFrom and optionSquares
     setMoveFrom('');
@@ -343,8 +430,10 @@ return (
               setPlayerToMate(fenTurn === 'w' ? 'white' : 'black');
               setHumanColor(fenTurn);
               setComputerColor(fenTurn === 'w' ? 'b' : 'w');
+              computerColorRef.current = (fenTurn === 'w' ? 'b' : 'w');
               // Controller: human starts after reset
               setCurrentMove('human');
+              currentMoveRef.current = 'human';
             } catch {}
           }}
         >
@@ -382,8 +471,10 @@ return (
               setPlayerToMate(fenTurn === 'w' ? 'white' : 'black');
               setHumanColor(fenTurn);
               setComputerColor(fenTurn === 'w' ? 'b' : 'w');
+              computerColorRef.current = (fenTurn === 'w' ? 'b' : 'w');
               // Controller: human starts after next
               setCurrentMove('human');
+              currentMoveRef.current = 'human';
               // update baseline to this newly fetched puzzle
               initialPositionRef.current = { fen: chessGame.fen(), player: fenTurn === 'w' ? 'white' : 'black', estimated: estimatedLabel };
             } catch {}
@@ -410,7 +501,7 @@ return (
                 );
               })()}
           <div className={`text-sm font-medium rounded p-2 border ${isAuthenticated ? 'border-slate-200 text-slate-800' : 'border-slate-200 text-slate-400 opacity-50'}`} aria-label="solved-counter">
-            <div>Solved</div>
+            <div>Solved: {isAuthenticated ? solvedCount : '-'}</div>
           </div>
         </div>
       </div>

@@ -43,7 +43,7 @@ def main():
     
     # Configuration
     BATCH_SIZE = 5  # Generate 5 mate positions per batch
-    SLEEP_TIME = 30  # Wait 30 seconds between batches
+    SLEEP_TIME = 120  # Wait 30 seconds between batches
     
     logger.info("Starting background mate position generator...")
     

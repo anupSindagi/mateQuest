@@ -20,7 +20,7 @@ export default function SignupPage() {
       const account = getAppwriteAccount();
       const databases = getAppwriteDatabases();
 
-      const databaseId = process.env.NEXT_PUBLIC_APPWRITE_DATABASE as string | undefined;
+      const databaseId = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID as string | undefined;
       const profilesCollectionId = process.env.NEXT_PUBLIC_APPWRITE_PROFILES_COLLECTION as string | undefined;
       if (!databaseId || !profilesCollectionId) {
         throw new Error('Missing Appwrite DB config. Set NEXT_PUBLIC_APPWRITE_DATABASE and NEXT_PUBLIC_APPWRITE_PROFILES_COLLECTION');
