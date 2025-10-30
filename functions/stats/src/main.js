@@ -7,7 +7,8 @@ const DATABASE_ID = process.env.APPWRITE_FUNCTION_GAMES_DATABASE_ID;
 export default async ({ req, res, log, error }) => {
   const endpoint = process.env.APPWRITE_FUNCTION_API_ENDPOINT;
   const projectId = process.env.APPWRITE_FUNCTION_PROJECT_ID;
-  const apiKey = req.headers['x-appwrite-key'] ?? '';
+  // Use a dedicated server API key configured on the function. Do NOT rely on request headers.
+  const apiKey = process.env.APPWRITE_API_KEY || '';
 
   if (!endpoint || !projectId || !apiKey || !DATABASE_ID || !PGN_COLLECTION_ID) {
     return res.json({
