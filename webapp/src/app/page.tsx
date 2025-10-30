@@ -1,9 +1,15 @@
+import { headers } from 'next/headers';
+
 export default async function Home() {
   // Fetch stats from secure server API
   let totalPuzzles = 0;
   let buckets: { m3?: number; m6?: number; m9?: number; m12?: number; m15?: number } = {};
   try {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL ?? ''}/api/stats`, { cache: 'no-store' });
+    const h = await headers();
+    const host = h.get('x-forwarded-host') ?? h.get('host');
+    const proto = h.get('x-forwarded-proto') ?? 'http';
+    const baseUrl = host ? `${proto}://${host}` : '';
+    const res = await fetch(`${baseUrl}/api/stats`, { cache: 'no-store' });
     if (res.ok) {
       const json = await res.json();
       totalPuzzles = json?.total ?? 0;
@@ -25,7 +31,7 @@ export default async function Home() {
           <div className="text-lg">
             Solve over <span className="font-semibold">{totalPuzzles}</span> mate puzzles
           </div>
-          <div className="text-sm text-slate-600">Adding over 1000 new puzzles every day</div>
+          <div className="text-sm text-slate-600">Adding over 1000 new puzzles every day. Updated every hour!</div>
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
             <div className="rounded border border-slate-200 p-3 text-center">
               <div className="text-xs text-slate-500">M3</div>

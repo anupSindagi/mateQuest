@@ -2,56 +2,88 @@ import Link from 'next/link';
 
 export default function PlayPage() {
   return (
-    <main className="mx-auto max-w-6xl px-4 py-10">
-      <h1 className="text-2xl font-semibold tracking-tight mb-4">Play</h1>
-      <p className="text-slate-700 mb-6">Choose a mode to begin.</p>
-      <div className="flex items-center gap-3">
-        <Link
-          href="/play/practice"
-          className="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-50"
-        >
-          Practice
-        </Link>
-        <Link
-          href="/play/rated"
-          className="inline-flex items-center justify-center rounded-md bg-slate-900 text-white px-4 py-2 text-sm font-medium hover:bg-slate-800"
-        >
-          Rated
-        </Link>
-      </div>
-      <div className="mt-6">
-        <p className="text-slate-700 mb-3">Practice difficulties</p>
-        <div className="flex flex-wrap items-center gap-3">
-          <Link
-            href="/play/practice?matein=m3"
-            className="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 hover:bg-slate-50"
-          >
-            Mates in ≤3
-          </Link>
-          <Link
-            href="/play/practice?matein=m6"
-            className="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 hover:bg-slate-50"
-          >
-            Mates in ≤6
-          </Link>
-          <Link
-            href="/play/practice?matein=m9"
-            className="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 hover:bg-slate-50"
-          >
-            Mates in ≤9
-          </Link>
-          <Link
-            href="/play/practice?matein=m12"
-            className="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 hover:bg-slate-50"
-          >
-            Mates in ≤12
-          </Link>
-          <Link
-            href="/play/practice?matein=m15"
-            className="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 hover:bg-slate-50"
-          >
-            Mates in ≤15
-          </Link>
+    <main className="min-h-[70vh] flex items-center justify-center px-4 py-10">
+      <div className="w-full max-w-3xl rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+        <h1 className="text-center text-2xl md:text-3xl font-semibold tracking-tight mb-6">Choose a play mode</h1>
+
+        <div className="grid gap-8">
+          {/* Practice box */}
+          <section className="rounded-lg border border-slate-200 p-6">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-medium text-slate-900">Practice</h2>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <Link
+                href="/play/practice?matein=m3"
+                className="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 hover:bg-slate-50"
+              >
+                Mates in ≤3
+              </Link>
+              <Link
+                href="/play/practice?matein=m6"
+                className="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 hover:bg-slate-50"
+              >
+                Mates in ≤6
+              </Link>
+              <Link
+                href="/play/practice?matein=m9"
+                className="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 hover:bg-slate-50"
+              >
+                Mates in ≤9
+              </Link>
+              <Link
+                href="/play/practice?matein=m12"
+                className="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 hover:bg-slate-50"
+              >
+                Mates in ≤12
+              </Link>
+              <Link
+                href="/play/practice?matein=m15"
+                className="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 hover:bg-slate-50"
+              >
+                Mates in ≤15
+              </Link>
+            </div>
+          </section>
+
+          {/* Rated box */}
+          <section className="rounded-lg border border-slate-200 p-6">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-medium text-slate-900">Rated <span className="text-slate-500 text-sm">(Coming soon)</span></h2>
+            </div>
+            <div className="flex flex-wrap items-center gap-3 opacity-60">
+              <span
+                aria-disabled
+                className="inline-flex cursor-not-allowed items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900"
+              >
+                Mates in ≤3
+              </span>
+              <span
+                aria-disabled
+                className="inline-flex cursor-not-allowed items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900"
+              >
+                Mates in ≤6
+              </span>
+              <span
+                aria-disabled
+                className="inline-flex cursor-not-allowed items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900"
+              >
+                Mates in ≤9
+              </span>
+              <span
+                aria-disabled
+                className="inline-flex cursor-not-allowed items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900"
+              >
+                Mates in ≤12
+              </span>
+              <span
+                aria-disabled
+                className="inline-flex cursor-not-allowed items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900"
+              >
+                Mates in ≤15
+              </span>
+            </div>
+          </section>
         </div>
       </div>
     </main>

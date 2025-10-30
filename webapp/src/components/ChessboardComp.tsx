@@ -4,6 +4,7 @@ import { useRef , useState, useMemo, useEffect} from 'react';
 import { Chess , type Square} from 'chess.js';
 import { Chessboard, type PieceDropHandlerArgs, type SquareHandlerArgs} from 'react-chessboard';
 import Engine from '@/lib/engine';
+import { getAppwriteAccount } from '@/lib/appwrite';
 
 export default function ChessboardComp({ matein }: { matein: 'm3' | 'm6' | 'm9' | 'm12' | 'm15' }) {
 
@@ -31,6 +32,22 @@ const [computerColor, setComputerColor] = useState<'w' | 'b'>('b');
 const [currentMove, setCurrentMove] = useState<'human' | 'computer'>('human');
 // Estimated eval from API (e.g., mate in number)
 const [estimatedEval, setEstimatedEval] = useState<string>('');
+// Auth state (for Solved box display)
+const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+useEffect(() => {
+  let isMounted = true;
+  (async () => {
+    try {
+      const account = getAppwriteAccount();
+      await account.get();
+      if (isMounted) setIsAuthenticated(true);
+    } catch {
+      if (isMounted) setIsAuthenticated(false);
+    }
+  })();
+  return () => { isMounted = false; };
+}, []);
 
 // Keep track of the baseline position to support true resets without re-fetching
 const initialPositionRef = useRef<{ fen: string; player: 'white' | 'black' | ''; estimated?: string }>({
@@ -381,16 +398,21 @@ return (
       </div>
       {/* Bottom section - empty, with mild border */}
       <div className="mt-2 border border-slate-200 rounded min-h-[36px] p-2">
-        {(() => {
-              const whiteAdv = (chessGame.turn() === 'w' ? 1 : -1) * positionEvaluation;
-              const label = possibleMate ? `M${possibleMate}` : `${whiteAdv >= 0 ? '+' : ''}${whiteAdv.toFixed(2)}`;
-              return (
-                <div className="text-sm font-medium text-slate-800 border border-slate-200 rounded p-2" aria-label="position-evaluation">
-                  <div className="text-xs text-slate-500">Current Eval: {label}</div>
-                  <div className="text-xs text-slate-500">Estimated Eval: {estimatedEval || '-'}</div>
-                </div>
-              );
-            })()}
+        <div className="flex items-start justify-between gap-2">
+          {(() => {
+                const whiteAdv = (chessGame.turn() === 'w' ? 1 : -1) * positionEvaluation;
+                const label = possibleMate ? `M${possibleMate}` : `${whiteAdv >= 0 ? '+' : ''}${whiteAdv.toFixed(2)}`;
+                return (
+                  <div className="text-sm font-medium text-slate-800 border border-slate-200 rounded p-2" aria-label="position-evaluation">
+                    <div className="text-xs text-slate-500">Current Eval: {label}</div>
+                    <div className="text-xs text-slate-500">Estimated Eval: {estimatedEval || '-'}</div>
+                  </div>
+                );
+              })()}
+          <div className={`text-sm font-medium rounded p-2 border ${isAuthenticated ? 'border-slate-200 text-slate-800' : 'border-slate-200 text-slate-400 opacity-50'}`} aria-label="solved-counter">
+            <div>Solved</div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
