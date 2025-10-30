@@ -30,9 +30,26 @@ export default async ({ req, res, log, error }) => {
 
   const databases = new Databases(client);
 
-  const getCount = async (filters = []) => {
-    const result = await databases.listDocuments(DATABASE_ID, PGN_COLLECTION_ID, [Query.limit(1), ...filters]);
-    return typeof result?.total === 'number' ? result.total : Array.isArray(result?.documents) ? result.documents.length : 0;
+  // Paginate to work around any total caps; accumulate counts across all pages
+  const getCountPaged = async (filters = []) => {
+    const pageSize = 100; // conservative page size
+    let offset = 0;
+    let count = 0;
+    let safety = 0;
+    while (true) {
+      const result = await databases.listDocuments(
+        DATABASE_ID,
+        PGN_COLLECTION_ID,
+        [Query.limit(pageSize), Query.offset(offset), ...filters]
+      );
+      const len = Array.isArray(result?.documents) ? result.documents.length : 0;
+      count += len;
+      if (len < pageSize) break; // last page
+      offset += len;
+      safety += 1;
+      if (safety > 100000) break; // hard stop safeguard
+    }
+    return count;
   };
 
   try {
@@ -44,17 +61,19 @@ export default async ({ req, res, log, error }) => {
       m12,
       m15,
     ] = await Promise.all([
-      getCount(),
-      getCount([Query.greaterThanEqual('eval_mate_in', 1), Query.lessThanEqual('eval_mate_in', 3)]),
-      getCount([Query.greaterThanEqual('eval_mate_in', 4), Query.lessThanEqual('eval_mate_in', 6)]),
-      getCount([Query.greaterThanEqual('eval_mate_in', 7), Query.lessThanEqual('eval_mate_in', 9)]),
-      getCount([Query.greaterThanEqual('eval_mate_in', 10), Query.lessThanEqual('eval_mate_in', 12)]),
-      getCount([Query.greaterThanEqual('eval_mate_in', 13), Query.lessThanEqual('eval_mate_in', 15)]),
+      getCountPaged(),
+      getCountPaged([Query.greaterThanEqual('eval_mate_in', 1), Query.lessThanEqual('eval_mate_in', 3)]),
+      getCountPaged([Query.greaterThanEqual('eval_mate_in', 4), Query.lessThanEqual('eval_mate_in', 6)]),
+      getCountPaged([Query.greaterThanEqual('eval_mate_in', 7), Query.lessThanEqual('eval_mate_in', 9)]),
+      getCountPaged([Query.greaterThanEqual('eval_mate_in', 10), Query.lessThanEqual('eval_mate_in', 12)]),
+      getCountPaged([Query.greaterThanEqual('eval_mate_in', 13), Query.lessThanEqual('eval_mate_in', 15)]),
     ]);
+    // If the service caps totals, recompute overall total as sum of buckets
+    const computedTotal = m3 + m6 + m9 + m12 + m15;
 
-    log(`Stats total=${total} m3=${m3} m6=${m6} m9=${m9} m12=${m12} m15=${m15}`);
+    log(`Stats total(computed)=${computedTotal} m3=${m3} m6=${m6} m9=${m9} m12=${m12} m15=${m15}`);
 
-    return res.json({ total, buckets: { m3, m6, m9, m12, m15 } });
+    return res.json({ total: computedTotal, buckets: { m3, m6, m9, m12, m15 } });
   } catch (err) {
     error('Stats error: ' + (err?.message || String(err)));
     return res.json({ error: 'Failed to fetch stats', message: err?.message || String(err) }, 500);
