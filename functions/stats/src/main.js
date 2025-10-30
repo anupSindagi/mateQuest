@@ -30,24 +30,41 @@ export default async ({ req, res, log, error }) => {
 
   const databases = new Databases(client);
 
-  // Paginate to work around any total caps; accumulate counts across all pages
-  const getCountPaged = async (filters = []) => {
-    const pageSize = 100; // conservative page size
-    let offset = 0;
+  // Faster counting with smart strategy:
+  // 1) Ask for total using limit(1). If < 5000, trust it.
+  // 2) Otherwise, paginate using cursor + select([$id]) to minimize payload.
+  const getCountSmart = async (filters = []) => {
+    const head = await databases.listDocuments(
+      DATABASE_ID,
+      PGN_COLLECTION_ID,
+      [Query.limit(1), ...filters]
+    );
+    const reportedTotal = typeof head?.total === 'number' ? head.total : undefined;
+    if (typeof reportedTotal === 'number' && reportedTotal < 5000) {
+      return reportedTotal;
+    }
+
+    const pageSize = 500; // balance between requests and payload
     let count = 0;
+    let lastId = null;
     let safety = 0;
+
     while (true) {
-      const result = await databases.listDocuments(
-        DATABASE_ID,
-        PGN_COLLECTION_ID,
-        [Query.limit(pageSize), Query.offset(offset), ...filters]
-      );
-      const len = Array.isArray(result?.documents) ? result.documents.length : 0;
-      count += len;
-      if (len < pageSize) break; // last page
-      offset += len;
+      const query = [
+        Query.limit(pageSize),
+        Query.orderAsc('$id'),
+        Query.select(['$id']),
+        ...filters,
+      ];
+      if (lastId) query.push(Query.cursorAfter(lastId));
+
+      const page = await databases.listDocuments(DATABASE_ID, PGN_COLLECTION_ID, query);
+      const docs = Array.isArray(page?.documents) ? page.documents : [];
+      count += docs.length;
+      if (docs.length < pageSize) break;
+      lastId = docs[docs.length - 1].$id;
       safety += 1;
-      if (safety > 100000) break; // hard stop safeguard
+      if (safety > 20000) break; // hard stop safeguard
     }
     return count;
   };
@@ -61,12 +78,12 @@ export default async ({ req, res, log, error }) => {
       m12,
       m15,
     ] = await Promise.all([
-      getCountPaged(),
-      getCountPaged([Query.greaterThanEqual('eval_mate_in', 1), Query.lessThanEqual('eval_mate_in', 3)]),
-      getCountPaged([Query.greaterThanEqual('eval_mate_in', 4), Query.lessThanEqual('eval_mate_in', 6)]),
-      getCountPaged([Query.greaterThanEqual('eval_mate_in', 7), Query.lessThanEqual('eval_mate_in', 9)]),
-      getCountPaged([Query.greaterThanEqual('eval_mate_in', 10), Query.lessThanEqual('eval_mate_in', 12)]),
-      getCountPaged([Query.greaterThanEqual('eval_mate_in', 13), Query.lessThanEqual('eval_mate_in', 15)]),
+      getCountSmart(),
+      getCountSmart([Query.greaterThanEqual('eval_mate_in', 1), Query.lessThanEqual('eval_mate_in', 3)]),
+      getCountSmart([Query.greaterThanEqual('eval_mate_in', 4), Query.lessThanEqual('eval_mate_in', 6)]),
+      getCountSmart([Query.greaterThanEqual('eval_mate_in', 7), Query.lessThanEqual('eval_mate_in', 9)]),
+      getCountSmart([Query.greaterThanEqual('eval_mate_in', 10), Query.lessThanEqual('eval_mate_in', 12)]),
+      getCountSmart([Query.greaterThanEqual('eval_mate_in', 13), Query.lessThanEqual('eval_mate_in', 15)]),
     ]);
     // If the service caps totals, recompute overall total as sum of buckets
     const computedTotal = m3 + m6 + m9 + m12 + m15;
