@@ -1,7 +1,55 @@
-export default function Home() {
+export default async function Home() {
+  // Fetch stats from secure server API
+  let totalPuzzles = 0;
+  let buckets: { m3?: number; m6?: number; m9?: number; m12?: number; m15?: number } = {};
+  try {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL ?? ''}/api/stats`, { cache: 'no-store' });
+    if (res.ok) {
+      const json = await res.json();
+      totalPuzzles = json?.total ?? 0;
+      buckets = json?.buckets ?? {};
+    }
+  } catch {
+    // ignore and keep defaults
+  }
+
   return (
-    <main className="min-h-screen flex items-center justify-center p-8">
-      <h1 className="text-2xl font-semibold">Welcome to Next.js</h1>
+    <main className="min-h-screen flex items-center justify-center p-8 bg-gradient-to-b from-slate-50 to-white">
+      <div className="w-full max-w-3xl rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+        <h1 className="text-3xl md:text-4xl font-bold text-slate-900 mb-3">MateQuest</h1>
+        <p className="text-slate-600 mb-6">
+          Train your tactical vision with curated mate-in-N puzzles powered by a fast in-browser engine.
+          Solve, learn, and climb the leaderboard.
+        </p>
+        <div className="grid gap-4 text-slate-800">
+          <div className="text-lg">
+            Solve over <span className="font-semibold">{totalPuzzles}</span> mate puzzles
+          </div>
+          <div className="text-sm text-slate-600">Adding over 1000 new puzzles every day</div>
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+            <div className="rounded border border-slate-200 p-3 text-center">
+              <div className="text-xs text-slate-500">M3</div>
+              <div className="text-base font-semibold">{buckets.m3 ?? '-'}</div>
+            </div>
+            <div className="rounded border border-slate-200 p-3 text-center">
+              <div className="text-xs text-slate-500">M6</div>
+              <div className="text-base font-semibold">{buckets.m6 ?? '-'}</div>
+            </div>
+            <div className="rounded border border-slate-200 p-3 text-center">
+              <div className="text-xs text-slate-500">M9</div>
+              <div className="text-base font-semibold">{buckets.m9 ?? '-'}</div>
+            </div>
+            <div className="rounded border border-slate-200 p-3 text-center">
+              <div className="text-xs text-slate-500">M12</div>
+              <div className="text-base font-semibold">{buckets.m12 ?? '-'}</div>
+            </div>
+            <div className="rounded border border-slate-200 p-3 text-center">
+              <div className="text-xs text-slate-500">M15</div>
+              <div className="text-base font-semibold">{buckets.m15 ?? '-'}</div>
+            </div>
+          </div>
+        </div>
+      </div>
     </main>
   );
 }

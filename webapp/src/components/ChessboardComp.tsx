@@ -24,6 +24,20 @@ const [bestLine, setBestLine] = useState('');
 const [possibleMate, setPossibleMate] = useState('');
 const [searchDepth, setSearchDepth] = useState(18);
 const [playerToMate, setPlayerToMate] = useState<'white' | 'black' | ''>('');
+// Explicit sides for clarity
+const [humanColor, setHumanColor] = useState<'w' | 'b'>('w');
+const [computerColor, setComputerColor] = useState<'w' | 'b'>('b');
+// Turn controller: whose move conceptually (independent of board turn color)
+const [currentMove, setCurrentMove] = useState<'human' | 'computer'>('human');
+// Estimated eval from API (e.g., mate in number)
+const [estimatedEval, setEstimatedEval] = useState<string>('');
+
+// Keep track of the baseline position to support true resets without re-fetching
+const initialPositionRef = useRef<{ fen: string; player: 'white' | 'black' | ''; estimated?: string }>({
+  fen: chessGame.fen(),
+  player: '',
+  estimated: ''
+});
 
 // load a FEN based on the matein prop (m3, m6, m9, m12, m15)
 useEffect(() => {
@@ -37,8 +51,9 @@ useEffect(() => {
       const response = await fetch(`/api/pgn/${matein}`, { cache: 'no-store' });
       if (!response.ok) return;
       const data = await response.json();
+      const evalMateIn = data?.eval_mate_in as number | undefined;
+      const estimatedLabel = typeof evalMateIn === 'number' ? `M${evalMateIn}` : '';
       const fenFromApi = data?.fen as string | undefined;
-      const playerField = data?.player_to_mate as 'white' | 'black' | undefined;
       if (!fenFromApi) return;
 
       if (isCancelled) return;
@@ -50,11 +65,16 @@ useEffect(() => {
         setOptionSquares({});
         setBestLine('');
         setPossibleMate('');
-        if (playerField === 'white' || playerField === 'black') {
-          setPlayerToMate(playerField);
-        } else {
-          setPlayerToMate('');
-        }
+        setEstimatedEval(estimatedLabel);
+        // Always set human to FEN side-to-move
+        const fenTurn = chessGame.turn(); // 'w' | 'b'
+        setHumanColor(fenTurn);
+        setComputerColor(fenTurn === 'w' ? 'b' : 'w');
+        setPlayerToMate(fenTurn === 'w' ? 'white' : 'black');
+        // Human always starts after load
+        setCurrentMove('human');
+        // set baseline for future resets
+        initialPositionRef.current = { fen: chessGame.fen(), player: fenTurn === 'w' ? 'white' : 'black', estimated: estimatedLabel };
       } catch {
         // ignore invalid FEN
       }
@@ -73,77 +93,61 @@ useEffect(() => {
 // ask Stockfish for best move and play it
 function makeBestMove() {
   if (chessGame.isGameOver() || chessGame.isDraw()) return;
-  // Ensure we never move on behalf of the human (playerToMate)
-  const humanColor = playerToMate === 'white' ? 'w' : playerToMate === 'black' ? 'b' : 'w';
-  const engineColor = humanColor === 'w' ? 'b' : 'w';
-  if (chessGame.turn() !== engineColor) return;
-  // start/refresh evaluation for the current position
+  // Only play when it's actually computer's turn on board and controller allows
+  if (currentMove !== 'computer') return;
+  if (chessGame.turn() !== computerColor) return;
   try { engine.stop(); } catch {}
-  engine.evaluatePosition(chessGame.fen(), searchDepth);
+  const effectiveDepth = Math.max(15, searchDepth);
+  engine.evaluatePosition(chessGame.fen(), effectiveDepth);
   engine.onMessage(({ bestMove, positionEvaluation: evalCp, pv, depth, possibleMate: mate }) => {
-    // accept only reasonably deep lines
-    if (depth && depth < 10) return;
-    if (typeof evalCp !== 'undefined') {
-      // store raw engine evaluation (from side-to-move perspective) in pawns
-      setPositionEvaluation(Number(evalCp) / 100);
-    }
+    if (depth && depth < 15) return;
+    if (typeof evalCp !== 'undefined') setPositionEvaluation(Number(evalCp) / 100);
     if (typeof mate !== 'undefined') setPossibleMate(mate);
     if (typeof pv !== 'undefined') setBestLine(pv);
     if (bestMove) {
-      // Guard again: only execute move if it is STILL engine's turn
-      const currentHumanColor = playerToMate === 'white' ? 'w' : playerToMate === 'black' ? 'b' : 'w';
-      const currentEngineColor = currentHumanColor === 'w' ? 'b' : 'w';
-      if (chessGame.turn() !== currentEngineColor) {
-        return;
-      }
+      // Guard against race
+      if (currentMove !== 'computer' || chessGame.turn() !== computerColor) return;
       const from = bestMove.slice(0, 2) as Square;
       const to = bestMove.slice(2, 4) as Square;
+      // Extra safety: ensure the piece at 'from' belongs to the computer side
+      const pieceAtFrom = chessGame.get(from);
+      if (!pieceAtFrom || pieceAtFrom.color !== computerColor) return;
       try {
         chessGame.move({ from, to, promotion: 'q' });
         setChessPosition(chessGame.fen());
-        // once we play, stop current search session
-        engine.stop();
+        try { engine.stop(); } catch {}
+        // Hand turn back to human
+        setCurrentMove('human');
       } catch {
-        // ignore illegal bestmove (shouldn't happen)
+        // ignore illegal bestmove
       }
     }
   });
 }
 
-// keep engine suggesting best move whenever position changes and it's engine's turn
-useEffect(() => {
-  // if it's the engine's turn (after a player move), calculate and play
-  // Human plays the side indicated by playerToMate; engine plays the opposite
-  const humanColor = playerToMate === 'white' ? 'w' : playerToMate === 'black' ? 'b' : 'w';
-  const engineColor = humanColor === 'w' ? 'b' : 'w';
-  if (!chessGame.isGameOver() && !chessGame.isDraw() && chessGame.turn() === engineColor) {
-    // slight delay for UX
-    const id = setTimeout(makeBestMove, 300);
-    return () => clearTimeout(id);
-  }
-}, [chessPosition, playerToMate]);
-
 // Always update numeric evaluation for the current position (even when it's human's turn)
 useEffect(() => {
-  const humanColor = playerToMate === 'white' ? 'w' : playerToMate === 'black' ? 'b' : 'w';
-  const engineColor = humanColor === 'w' ? 'b' : 'w';
-  // When it's engine's turn, makeBestMove will already evaluate; avoid doubling
-  if (chessGame.turn() === engineColor) return;
-
   try {
     engine.stop();
   } catch {}
-  engine.evaluatePosition(chessGame.fen(), searchDepth);
+  const effectiveDepth = Math.max(15, searchDepth);
+  engine.evaluatePosition(chessGame.fen(), effectiveDepth);
   engine.onMessage(({ positionEvaluation: evalCp, depth, possibleMate: mate }) => {
-    if (typeof evalCp !== 'undefined') {
-      setPositionEvaluation(Number(evalCp) / 100);
-    }
+    if (typeof evalCp !== 'undefined') setPositionEvaluation(Number(evalCp) / 100);
     if (typeof mate !== 'undefined') setPossibleMate(mate);
     if (depth && depth >= 10) {
-      engine.stop();
+      try { engine.stop(); } catch {}
     }
   });
-}, [chessPosition, playerToMate]);
+}, [chessPosition]);
+
+// Engine move trigger: only when controller says it's computer's move
+useEffect(() => {
+  if (!chessGame.isGameOver() && !chessGame.isDraw() && currentMove === 'computer' && chessGame.turn() === computerColor) {
+    const id = setTimeout(makeBestMove, 200);
+    return () => clearTimeout(id);
+  }
+}, [chessPosition, currentMove, computerColor]);
 
 // get the move options for a square to show valid moves
 function getMoveOptions(square: Square) {
@@ -243,12 +247,8 @@ function onSquareClick({
   // update the position state
   setChessPosition(chessGame.fen());
 
-  // engine responds with best move shortly after player's move
-  {
-    const humanColor = playerToMate === 'white' ? 'w' : playerToMate === 'black' ? 'b' : 'w';
-    const engineColor = humanColor === 'w' ? 'b' : 'w';
-    if (chessGame.turn() === engineColor) setTimeout(makeBestMove, 150);
-  }
+  // user moved; now it's computer's turn according to controller
+  setCurrentMove('computer');
 
   // clear moveFrom and optionSquares
   setMoveFrom('');
@@ -276,16 +276,12 @@ function onPieceDrop({
     // update the position state upon successful move to trigger a re-render of the chessboard
     setChessPosition(chessGame.fen());
 
+    // user moved; now it's computer's turn according to controller
+    setCurrentMove('computer');
+
     // clear moveFrom and optionSquares
     setMoveFrom('');
     setOptionSquares({});
-
-    // engine responds with best move shortly after player's move
-    {
-      const humanColor = playerToMate === 'white' ? 'w' : playerToMate === 'black' ? 'b' : 'w';
-      const engineColor = humanColor === 'w' ? 'b' : 'w';
-      if (chessGame.turn() === engineColor) setTimeout(makeBestMove, 150);
-    }
 
     // return true as the move was successful
     return true;
@@ -301,31 +297,100 @@ const chessboardOptions = {
   onSquareClick,
   position: chessPosition,
   squareStyles: optionSquares,
-  id: 'click-or-drag-to-move'
+  id: 'click-or-drag-to-move',
+  boardOrientation: (humanColor === 'w' ? 'white' : 'black') as 'white' | 'black'
 };
 
 // render the chessboard centered with constrained size to avoid overflow
 return (
   <div className="w-full flex items-center justify-center">
     <div className="w-[min(90vw,80vh,520px)]">
-      <div className="mb-2 flex items-center justify-between">
-        {playerToMate && (
-          <div className="text-sm text-slate-700">
-            {(playerToMate === 'white' ? 'White' : 'Black') + ' to move'}
-          </div>
-        )}
-        {(() => {
-          const whiteAdv = (chessGame.turn() === 'w' ? 1 : -1) * positionEvaluation;
-          const label = possibleMate ? `M${possibleMate}` : `${whiteAdv >= 0 ? '+' : ''}${whiteAdv.toFixed(2)}`;
-          return (
-            <div className="text-sm font-medium text-slate-800" aria-label="position-evaluation">
-              {label}
+      {/* Top section - empty, with mild border */}
+      <div className="mb-2 border border-slate-200 rounded min-h-[36px] p-2 flex items-center justify-between">
+        <button
+          className="px-3 py-1 text-xs bg-slate-100 border border-slate-300 rounded hover:bg-slate-200 transition-colors"
+          onClick={async () => {
+            try {
+              engine.stop();
+              // Reset to the baseline without calling the API
+              const { fen, estimated } = initialPositionRef.current;
+              chessGame.load(fen);
+              setChessPosition(chessGame.fen());
+              setMoveFrom('');
+              setOptionSquares({});
+              setBestLine('');
+              setPossibleMate('');
+              setEstimatedEval(estimated ?? '');
+              // Human is always FEN side-to-move
+              const fenTurn = chessGame.turn();
+              setPlayerToMate(fenTurn === 'w' ? 'white' : 'black');
+              setHumanColor(fenTurn);
+              setComputerColor(fenTurn === 'w' ? 'b' : 'w');
+              // Controller: human starts after reset
+              setCurrentMove('human');
+            } catch {}
+          }}
+        >
+          Reset
+        </button>
+        <div className="flex items-center justify-between ">
+          {playerToMate && (
+            <div className={`text-sm px-2 py-1 border border-slate-200 rounded ${playerToMate === 'white' ? 'bg-white text-slate-900' : 'bg-slate-900 text-white'}`}>
+              {(playerToMate === 'white' ? 'White' : 'Black') + ' to move'}
             </div>
-          );
-        })()}
+          )}
+          
+        </div>
+        <button
+          className="px-3 py-1 text-xs bg-slate-100 border border-slate-300 rounded hover:bg-slate-200 transition-colors"
+          onClick={async () => {
+            try {
+              engine.stop();
+              const response = await fetch(`/api/pgn/${matein}`, { cache: 'no-store' });
+              if (!response.ok) return;
+              const data = await response.json();
+              const evalMateIn = data?.eval_mate_in as number | undefined;
+              const estimatedLabel = typeof evalMateIn === 'number' ? `M${evalMateIn}` : '';
+              const fenFromApi = data?.fen as string | undefined;
+              if (!fenFromApi) return;
+              chessGame.load(fenFromApi);
+              setChessPosition(chessGame.fen());
+              setMoveFrom('');
+              setOptionSquares({});
+              setBestLine('');
+              setPossibleMate('');
+              setEstimatedEval(estimatedLabel);
+              // Human is always FEN side-to-move
+              const fenTurn = chessGame.turn();
+              setPlayerToMate(fenTurn === 'w' ? 'white' : 'black');
+              setHumanColor(fenTurn);
+              setComputerColor(fenTurn === 'w' ? 'b' : 'w');
+              // Controller: human starts after next
+              setCurrentMove('human');
+              // update baseline to this newly fetched puzzle
+              initialPositionRef.current = { fen: chessGame.fen(), player: fenTurn === 'w' ? 'white' : 'black', estimated: estimatedLabel };
+            } catch {}
+          }}
+        >
+          Next
+        </button>
       </div>
+
       <div className="aspect-square">
         <Chessboard options={chessboardOptions} />
+      </div>
+      {/* Bottom section - empty, with mild border */}
+      <div className="mt-2 border border-slate-200 rounded min-h-[36px] p-2">
+        {(() => {
+              const whiteAdv = (chessGame.turn() === 'w' ? 1 : -1) * positionEvaluation;
+              const label = possibleMate ? `M${possibleMate}` : `${whiteAdv >= 0 ? '+' : ''}${whiteAdv.toFixed(2)}`;
+              return (
+                <div className="text-sm font-medium text-slate-800 border border-slate-200 rounded p-2" aria-label="position-evaluation">
+                  <div className="text-xs text-slate-500">Current Eval: {label}</div>
+                  <div className="text-xs text-slate-500">Estimated Eval: {estimatedEval || '-'}</div>
+                </div>
+              );
+            })()}
       </div>
     </div>
   </div>

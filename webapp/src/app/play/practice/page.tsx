@@ -1,11 +1,12 @@
 import ChessboardComp from '@/components/ChessboardComp';
 
-export default function PracticePage({
+export default async function PracticePage({
   searchParams
 }: {
-  searchParams: { matein?: 'm3' | 'm6' | 'm9' | 'm12' | 'm15' | string };
+  searchParams: Promise<{ matein?: 'm3' | 'm6' | 'm9' | 'm12' | 'm15' | string }>;
 }) {
-  const matein = (searchParams?.matein as 'm3' | 'm6' | 'm9' | 'm12' | 'm15') || 'm3';
+  const params = await searchParams;
+  const matein = (params?.matein as 'm3' | 'm6' | 'm9' | 'm12' | 'm15') || 'm3';
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-10">
