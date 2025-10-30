@@ -28,6 +28,7 @@ export default async ({ req, res, log, error }) => {
 
   return res.json({
     motto: "Build like a team of hundreds_",
+    project_id: process.env.APPWRITE_FUNCTION_PROJECT_ID,
     learn: "https://appwrite.io/docs",
     connect: "https://appwrite.io/discord",
     getInspired: "https://builtwith.appwrite.io",
