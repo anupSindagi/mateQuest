@@ -3,3 +3,8 @@
 body {
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Prevent header/content from shifting when pages have/lose vertical scrollbars */
+html {
+  scrollbar-gutter: stable;
+}

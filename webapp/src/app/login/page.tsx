@@ -36,8 +36,9 @@ export default function LoginPage() {
   }, []);
 
   return (
-    <main className="min-h-[60vh] w-full flex items-center justify-center">
-      <div className="w-full max-w-sm border border-slate-200 rounded-lg p-6 shadow-sm bg-white">
+    <main className="min-h-screen p-8 bg-gradient-to-b from-slate-50 to-white">
+      <div className="mx-auto max-w-6xl px-4">
+      <div className="w-full max-w-sm mx-auto border border-slate-200 rounded-lg p-6 shadow-sm bg-white">
         <h1 className="text-xl font-semibold mb-4">Login</h1>
         <form onSubmit={onSubmit} className="space-y-3">
           <div className="space-y-1">
@@ -96,7 +97,7 @@ export default function LoginPage() {
         >
           Create account
         </Link>
-
+      </div>
       </div>
     </main>
   );

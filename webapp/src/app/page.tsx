@@ -20,8 +20,9 @@ export default async function Home() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center p-8 bg-gradient-to-b from-slate-50 to-white">
-      <div className="w-full max-w-3xl rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+    <main className="min-h-screen p-8 bg-gradient-to-b from-slate-50 to-white">
+      <div className="mx-auto max-w-6xl px-4">
+        <div className="w-full max-w-3xl mx-auto rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
         <h1 className="text-3xl md:text-4xl font-bold text-slate-900 mb-3">MateQuest</h1>
         <p className="text-slate-600 mb-6">
           Train your tactical vision with curated mate-in-N puzzles powered by a fast in-browser engine.
@@ -55,6 +56,7 @@ export default async function Home() {
             </div>
           </div>
         </div>
+      </div>
       </div>
     </main>
   );

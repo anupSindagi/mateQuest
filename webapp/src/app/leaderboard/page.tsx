@@ -205,7 +205,8 @@ export default function LeaderboardPage() {
   }
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-10">
+    <main className="min-h-screen p-8 bg-gradient-to-b from-slate-50 to-white">
+      <div className="mx-auto max-w-6xl px-4">
       <h1 className="text-2xl font-semibold tracking-tight mb-6">Leaderboard</h1>
       
       {/* Tabs */}
@@ -373,6 +374,7 @@ export default function LeaderboardPage() {
           <p className="text-lg text-gray-600">Coming soon</p>
         </div>
       )}
+      </div>
     </main>
   );
 }
