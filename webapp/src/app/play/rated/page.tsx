@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { getAppwriteAccount } from '@/lib/appwrite';
 import ChessboardComp from '@/components/ChessboardComp';
 
-export default function RatedPage() {
+function RatedPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isAuthed, setIsAuthed] = useState<boolean | null>(null);
@@ -43,9 +43,22 @@ export default function RatedPage() {
   return (
     <main className="mx-auto max-w-6xl px-4 py-10">
       <h1 className="text-2xl font-semibold tracking-tight mb-4">Rated</h1>
-      <p className="text-slate-700 mb-6">Solve puzzles that <b>mate in &le;{mValue} moves</b>.</p>
+      <p className="text-slate-700 mb-6">Solve puzzles that mate in &le;{mValue} moves.</p>
       <ChessboardComp matein={matein} rated={true} />
     </main>
+  );
+}
+
+export default function RatedPage() {
+  return (
+    <Suspense fallback={
+      <main className="mx-auto max-w-6xl px-4 py-10">
+        <h1 className="text-2xl font-semibold tracking-tight mb-4">Rated</h1>
+        <p className="text-slate-700">Loading…</p>
+      </main>
+    }>
+      <RatedPageContent />
+    </Suspense>
   );
 }
 
