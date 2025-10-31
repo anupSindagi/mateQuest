@@ -13,6 +13,7 @@ export default function PlayPage() {
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-medium text-slate-900">Practice</h2>
             </div>
+            <p className="text-sm text-slate-600 mb-4">This is with stockfish assistance.</p>
             <div className="flex flex-wrap items-center gap-3">
               <Link
                 href="/play/practice?matein=m3"
@@ -50,39 +51,40 @@ export default function PlayPage() {
           {/* Rated box */}
           <section className="rounded-lg border border-slate-200 p-6">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-medium text-slate-900">Rated <span className="text-slate-500 text-sm">(Coming soon)</span></h2>
+              <h2 className="text-lg font-medium text-slate-900">Rated</h2>
             </div>
-            <div className="flex flex-wrap items-center gap-3 opacity-60">
-              <span
-                aria-disabled
-                className="inline-flex cursor-not-allowed items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900"
+            <p className="text-sm text-slate-600 mb-4">This is without stockfish assistance.</p>
+            <div className="flex flex-wrap items-center gap-3">
+              <Link
+                href="/play/rated?matein=m3"
+                className="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 hover:bg-slate-50"
               >
                 Mates in ≤3
-              </span>
-              <span
-                aria-disabled
-                className="inline-flex cursor-not-allowed items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900"
+              </Link>
+              <Link
+                href="/play/rated?matein=m6"
+                className="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 hover:bg-slate-50"
               >
                 Mates in ≤6
-              </span>
-              <span
-                aria-disabled
-                className="inline-flex cursor-not-allowed items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900"
+              </Link>
+              <Link
+                href="/play/rated?matein=m9"
+                className="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 hover:bg-slate-50"
               >
                 Mates in ≤9
-              </span>
-              <span
-                aria-disabled
-                className="inline-flex cursor-not-allowed items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900"
+              </Link>
+              <Link
+                href="/play/rated?matein=m12"
+                className="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 hover:bg-slate-50"
               >
                 Mates in ≤12
-              </span>
-              <span
-                aria-disabled
-                className="inline-flex cursor-not-allowed items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900"
+              </Link>
+              <Link
+                href="/play/rated?matein=m15"
+                className="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 hover:bg-slate-50"
               >
                 Mates in ≤15
-              </span>
+              </Link>
             </div>
           </section>
         </div>

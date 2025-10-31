@@ -1,16 +1,24 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { getAppwriteAccount } from '@/lib/appwrite';
-import { useRouter } from 'next/navigation';
+import ChessboardComp from '@/components/ChessboardComp';
 
 export default function RatedPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [isAuthed, setIsAuthed] = useState<boolean | null>(null);
+
+  const matein = useMemo(() => {
+    const raw = searchParams.get('matein') as 'm3' | 'm6' | 'm9' | 'm12' | 'm15' | null;
+    return (raw ?? 'm3');
+  }, [searchParams]);
+  const mValue = useMemo(() => matein.replace('m', ''), [matein]);
 
   useEffect(() => {
     let mounted = true;
-    const run = async () => {
+    (async () => {
       try {
         const account = getAppwriteAccount();
         await account.get();
@@ -19,8 +27,7 @@ export default function RatedPage() {
         if (mounted) setIsAuthed(false);
         router.replace('/login');
       }
-    };
-    run();
+    })();
     return () => { mounted = false; };
   }, [router]);
 
@@ -36,7 +43,8 @@ export default function RatedPage() {
   return (
     <main className="mx-auto max-w-6xl px-4 py-10">
       <h1 className="text-2xl font-semibold tracking-tight mb-4">Rated</h1>
-      <p className="text-slate-700">Solve puzzles to impact your rating and climb the leaderboard.</p>
+      <p className="text-slate-700 mb-6">Solve puzzles that <b>mate in &le;{mValue} moves</b>.</p>
+      <ChessboardComp matein={matein} rated={true} />
     </main>
   );
 }

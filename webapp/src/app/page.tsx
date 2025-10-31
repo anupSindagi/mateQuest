@@ -1,4 +1,6 @@
 import { headers } from 'next/headers';
+import { Crown } from 'lucide-react';
+import FAQ from '@/components/FAQ';
 
 export default async function Home() {
   // Fetch stats from secure server API
@@ -23,7 +25,10 @@ export default async function Home() {
     <main className="min-h-screen p-8 bg-gradient-to-b from-slate-50 to-white">
       <div className="mx-auto max-w-6xl px-4">
         <div className="w-full max-w-3xl mx-auto rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-        <h1 className="text-3xl md:text-4xl font-bold text-slate-900 mb-3">MateQuest</h1>
+        <h1 className="text-3xl md:text-4xl font-bold text-slate-900 mb-3 flex items-center gap-2">
+          <Crown className="h-8 w-8 md:h-10 md:w-10 text-amber-600" aria-hidden />
+          <span>mateQuest</span>
+        </h1>
         <p className="text-slate-600 mb-6">
           Train your tactical vision with curated mate-in-N puzzles powered by a fast in-browser engine.
           Solve, learn, and climb the leaderboard.
@@ -57,6 +62,7 @@ export default async function Home() {
           </div>
         </div>
       </div>
+      <FAQ />
       </div>
     </main>
   );

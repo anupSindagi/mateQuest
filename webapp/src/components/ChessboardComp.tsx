@@ -7,7 +7,7 @@ import Engine from '@/lib/engine';
 import { getAppwriteAccount, getAppwriteDatabases } from '@/lib/appwrite';
 import { Query } from 'appwrite';
 
-export default function ChessboardComp({ matein }: { matein: 'm3' | 'm6' | 'm9' | 'm12' | 'm15' }) {
+export default function ChessboardComp({ matein, rated }: { matein: 'm3' | 'm6' | 'm9' | 'm12' | 'm15'; rated: boolean }) {
 
 // initialise the engine
 const engine = useMemo(() => new Engine(), []);
@@ -45,6 +45,7 @@ const [userEmail, setUserEmail] = useState<string>('');
 const [solvedCount, setSolvedCount] = useState<number>(0);
 const profileDocIdRef = useRef<string>('');
 const practiceObjRef = useRef<Record<'m3' | 'm6' | 'm9' | 'm12' | 'm15', number>>({ m3: 0, m6: 0, m9: 0, m12: 0, m15: 0 });
+const ratedObjRef = useRef<Record<'m3' | 'm6' | 'm9' | 'm12' | 'm15', number>>({ m3: 0, m6: 0, m9: 0, m12: 0, m15: 0 });
 const PROFILE_COLLECTION_ID = 'profiles';
 
 // auth + profile load
@@ -68,30 +69,56 @@ useEffect(() => {
         const doc = Array.isArray(res?.documents) && res.documents.length > 0 ? res.documents[0] : null;
         if (doc) {
           profileDocIdRef.current = doc.$id as string;
+          
           // parse practice json string
-          const raw = doc.practice as string | undefined;
-          let parsed: any = { m3: 0, m6: 0, m9: 0, m12: 0, m15: 0 };
-          if (raw && typeof raw === 'string') {
+          const practiceRaw = doc.practice as string | undefined;
+          let practiceParsed: any = { m3: 0, m6: 0, m9: 0, m12: 0, m15: 0 };
+          if (practiceRaw && typeof practiceRaw === 'string') {
             try {
-              parsed = JSON.parse(raw);
+              practiceParsed = JSON.parse(practiceRaw);
             } catch {
               try {
-                const fixed = raw.replace(/([,{]\s*)(m3|m6|m9|m12|m15)(\s*:)/g, '$1"$2"$3');
-                parsed = JSON.parse(fixed);
+                const fixed = practiceRaw.replace(/([,{]\s*)(m3|m6|m9|m12|m15)(\s*:)/g, '$1"$2"$3');
+                practiceParsed = JSON.parse(fixed);
               } catch {
-                parsed = { m3: 0, m6: 0, m9: 0, m12: 0, m15: 0 };
+                practiceParsed = { m3: 0, m6: 0, m9: 0, m12: 0, m15: 0 };
               }
             }
           }
           practiceObjRef.current = {
-            m3: Number(parsed?.m3 ?? 0),
-            m6: Number(parsed?.m6 ?? 0),
-            m9: Number(parsed?.m9 ?? 0),
-            m12: Number(parsed?.m12 ?? 0),
-            m15: Number(parsed?.m15 ?? 0)
+            m3: Number(practiceParsed?.m3 ?? 0),
+            m6: Number(practiceParsed?.m6 ?? 0),
+            m9: Number(practiceParsed?.m9 ?? 0),
+            m12: Number(practiceParsed?.m12 ?? 0),
+            m15: Number(practiceParsed?.m15 ?? 0)
           };
-          // set current solved count for this mate bucket
-          setSolvedCount(practiceObjRef.current[matein]);
+          
+          // parse rated json string
+          const ratedRaw = doc.rated as string | undefined;
+          let ratedParsed: any = { m3: 0, m6: 0, m9: 0, m12: 0, m15: 0 };
+          if (ratedRaw && typeof ratedRaw === 'string') {
+            try {
+              ratedParsed = JSON.parse(ratedRaw);
+            } catch {
+              try {
+                const fixed = ratedRaw.replace(/([,{]\s*)(m3|m6|m9|m12|m15)(\s*:)/g, '$1"$2"$3');
+                ratedParsed = JSON.parse(fixed);
+              } catch {
+                ratedParsed = { m3: 0, m6: 0, m9: 0, m12: 0, m15: 0 };
+              }
+            }
+          }
+          ratedObjRef.current = {
+            m3: Number(ratedParsed?.m3 ?? 0),
+            m6: Number(ratedParsed?.m6 ?? 0),
+            m9: Number(ratedParsed?.m9 ?? 0),
+            m12: Number(ratedParsed?.m12 ?? 0),
+            m15: Number(ratedParsed?.m15 ?? 0)
+          };
+          
+          // set current solved count for this mate bucket based on rated prop
+          const activeObj = rated ? ratedObjRef.current : practiceObjRef.current;
+          setSolvedCount(activeObj[matein]);
         }
       } catch {
         // ignore profile load errors
@@ -102,7 +129,7 @@ useEffect(() => {
   })();
   return () => { isMounted = false; };
 // eslint-disable-next-line react-hooks/exhaustive-deps
-}, []);
+}, [rated, matein]);
 
 // helper to persist increment when puzzle is solved by human
 async function persistSolvedIncrement() {
@@ -111,13 +138,24 @@ async function persistSolvedIncrement() {
     if (!profileDocIdRef.current) return;
     const databases = getAppwriteDatabases();
     const dbId = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID as string;
-    // increment in-memory
-    const nextVal = (practiceObjRef.current[matein] ?? 0) + 1;
-    practiceObjRef.current = { ...practiceObjRef.current, [matein]: nextVal } as typeof practiceObjRef.current;
-    setSolvedCount(nextVal);
-    const practiceString = JSON.stringify(practiceObjRef.current);
-    const practiceTotal = Object.values(practiceObjRef.current).reduce((sum, val) => sum + val, 0);
-    await databases.updateDocument(dbId, PROFILE_COLLECTION_ID, profileDocIdRef.current, { practice: practiceString, practice_total: practiceTotal });
+    
+    if (rated) {
+      // increment in-memory for rated
+      const nextVal = (ratedObjRef.current[matein] ?? 0) + 1;
+      ratedObjRef.current = { ...ratedObjRef.current, [matein]: nextVal } as typeof ratedObjRef.current;
+      setSolvedCount(nextVal);
+      const ratedString = JSON.stringify(ratedObjRef.current);
+      const ratedTotal = Object.values(ratedObjRef.current).reduce((sum, val) => sum + val, 0);
+      await databases.updateDocument(dbId, PROFILE_COLLECTION_ID, profileDocIdRef.current, { rated: ratedString, rated_total: ratedTotal });
+    } else {
+      // increment in-memory for practice
+      const nextVal = (practiceObjRef.current[matein] ?? 0) + 1;
+      practiceObjRef.current = { ...practiceObjRef.current, [matein]: nextVal } as typeof practiceObjRef.current;
+      setSolvedCount(nextVal);
+      const practiceString = JSON.stringify(practiceObjRef.current);
+      const practiceTotal = Object.values(practiceObjRef.current).reduce((sum, val) => sum + val, 0);
+      await databases.updateDocument(dbId, PROFILE_COLLECTION_ID, profileDocIdRef.current, { practice: practiceString, practice_total: practiceTotal });
+    }
   } catch {
     // ignore update errors for now
   }
@@ -489,8 +527,8 @@ return (
       </div>
       {/* Bottom section - empty, with mild border */}
       <div className="mt-2 border border-slate-200 rounded min-h-[36px] p-2">
-        <div className="flex items-start justify-between gap-2">
-          {(() => {
+        <div className={`flex items-start gap-2 ${rated ? 'justify-end' : 'justify-between'}`}>
+          {!rated && (() => {
                 const whiteAdv = (chessGame.turn() === 'w' ? 1 : -1) * positionEvaluation;
                 const label = possibleMate ? `M${possibleMate}` : `${whiteAdv >= 0 ? '+' : ''}${whiteAdv.toFixed(2)}`;
                 return (
