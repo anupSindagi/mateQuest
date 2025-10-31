@@ -13,7 +13,7 @@ export default function PlayPage() {
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-medium text-slate-900">Practice</h2>
             </div>
-            <p className="text-sm text-slate-600 mb-4">This is with stockfish assistance.</p>
+            <p className="text-sm text-slate-600 mb-4">This is with stockfish assistance. No login required.</p>
             <div className="flex flex-wrap items-center gap-3">
               <Link
                 href="/play/practice?matein=m3"
@@ -53,7 +53,7 @@ export default function PlayPage() {
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-medium text-slate-900">Rated</h2>
             </div>
-            <p className="text-sm text-slate-600 mb-4">This is without stockfish assistance.</p>
+            <p className="text-sm text-slate-600 mb-4">This is without stockfish assistance. Needs to be logged in to play.</p>
             <div className="flex flex-wrap items-center gap-3">
               <Link
                 href="/play/rated?matein=m3"
