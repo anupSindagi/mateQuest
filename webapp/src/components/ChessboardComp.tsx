@@ -48,6 +48,40 @@ const practiceObjRef = useRef<Record<'m3' | 'm6' | 'm9' | 'm12' | 'm15', number>
 const ratedObjRef = useRef<Record<'m3' | 'm6' | 'm9' | 'm12' | 'm15', number>>({ m3: 0, m6: 0, m9: 0, m12: 0, m15: 0 });
 const PROFILE_COLLECTION_ID = 'profiles';
 
+// Audio refs for sound effects
+const moveSoundRef = useRef<HTMLAudioElement | null>(null);
+const successSoundRef = useRef<HTMLAudioElement | null>(null);
+
+// Initialize audio elements
+useEffect(() => {
+  moveSoundRef.current = new Audio('/sounds/chessMove.wav');
+  successSoundRef.current = new Audio('/sounds/success.m4a');
+  return () => {
+    moveSoundRef.current = null;
+    successSoundRef.current = null;
+  };
+}, []);
+
+// Helper function to play move sound
+const playMoveSound = () => {
+  if (moveSoundRef.current) {
+    moveSoundRef.current.currentTime = 0;
+    moveSoundRef.current.play().catch(() => {
+      // Ignore audio play errors (e.g., user hasn't interacted with page)
+    });
+  }
+};
+
+// Helper function to play success sound
+const playSuccessSound = () => {
+  if (successSoundRef.current) {
+    successSoundRef.current.currentTime = 0;
+    successSoundRef.current.play().catch(() => {
+      // Ignore audio play errors (e.g., user hasn't interacted with page)
+    });
+  }
+};
+
 // auth + profile load
 useEffect(() => {
   let isMounted = true;
@@ -321,6 +355,13 @@ function onSquareClick({
   square,
   piece
 }: SquareHandlerArgs) {
+  // if clicking on the same piece that's already selected, deselect it
+  if (moveFrom === square && piece) {
+    setMoveFrom('');
+    setOptionSquares({});
+    return;
+  }
+
   // piece clicked to move
   if (!moveFrom && piece) {
     // get the move options for the square
@@ -376,9 +417,13 @@ function onSquareClick({
 
   // update the position state
   setChessPosition(chessGame.fen());
+  
+  // play move sound
+  playMoveSound();
 
-  // if human just delivered mate, persist increment
+  // if human just delivered mate, persist increment and play success sound
   if (chessGame.isCheckmate()) {
+    playSuccessSound();
     void persistSolvedIncrement();
   }
 
@@ -411,9 +456,13 @@ function onPieceDrop({
 
     // update the position state upon successful move to trigger a re-render of the chessboard
     setChessPosition(chessGame.fen());
+    
+    // play move sound
+    playMoveSound();
 
-    // if human just delivered mate, persist increment
+    // if human just delivered mate, persist increment and play success sound
     if (chessGame.isCheckmate()) {
+      playSuccessSound();
       void persistSolvedIncrement();
     }
 
@@ -433,22 +482,67 @@ function onPieceDrop({
   }
 }
 
+// Helper function to find king's square for a given color
+const findKingSquare = (color: 'w' | 'b'): Square | null => {
+  const squares: Square[] = ['a8', 'b8', 'c8', 'd8', 'e8', 'f8', 'g8', 'h8',
+                             'a7', 'b7', 'c7', 'd7', 'e7', 'f7', 'g7', 'h7',
+                             'a6', 'b6', 'c6', 'd6', 'e6', 'f6', 'g6', 'h6',
+                             'a5', 'b5', 'c5', 'd5', 'e5', 'f5', 'g5', 'h5',
+                             'a4', 'b4', 'c4', 'd4', 'e4', 'f4', 'g4', 'h4',
+                             'a3', 'b3', 'c3', 'd3', 'e3', 'f3', 'g3', 'h3',
+                             'a2', 'b2', 'c2', 'd2', 'e2', 'f2', 'g2', 'h2',
+                             'a1', 'b1', 'c1', 'd1', 'e1', 'f1', 'g1', 'h1'];
+  for (const square of squares) {
+    const piece = chessGame.get(square);
+    if (piece && piece.type === 'k' && piece.color === color) {
+      return square;
+    }
+  }
+  return null;
+};
+
+// Check if either side is in check and highlight king square
+const checkSquareStyles = useMemo(() => {
+  const styles: Record<string, React.CSSProperties> = {};
+  
+  // Check if the side to move is in check
+  if (chessGame.inCheck()) {
+    const checkedColor = chessGame.turn(); // 'w' or 'b'
+    const kingSquare = findKingSquare(checkedColor);
+    if (kingSquare) {
+      styles[kingSquare] = {
+        boxShadow: '0 0 12px 3px rgba(239,68,68,0.5)',
+        borderRadius: '2px'
+      };
+    }
+  }
+  
+  return styles;
+}, [chessPosition]);
+
+// Merge optionSquares with check highlighting
+const mergedSquareStyles = useMemo(() => {
+  return { ...optionSquares, ...checkSquareStyles };
+}, [optionSquares, checkSquareStyles]);
+
 // set the chessboard options
 const chessboardOptions = {
   onPieceDrop,
   onSquareClick,
   position: chessPosition,
-  squareStyles: optionSquares,
+  squareStyles: mergedSquareStyles,
   id: 'click-or-drag-to-move',
   boardOrientation: (humanColor === 'w' ? 'white' : 'black') as 'white' | 'black'
 };
 
 // render the chessboard centered with constrained size to avoid overflow
+const isGameOver = chessGame.isGameOver() || chessGame.isDraw();
+
 return (
   <div className="w-full flex items-center justify-center">
     <div className="w-[min(90vw,80vh,520px)]">
       {/* Top section - empty, with mild border */}
-      <div className="mb-2 border border-slate-200 rounded min-h-[36px] p-2 flex items-center justify-between">
+      <div className={`mb-2 border border-slate-200 rounded min-h-[36px] p-2 flex items-center justify-between transition-all duration-300 ${isGameOver ? 'shadow-[0_0_1px_2px_rgba(217,119,6,0.6)]' : ''}`}>
         <button
           className="px-3 py-1 text-xs bg-slate-100 border border-slate-300 rounded hover:bg-slate-200 transition-colors"
           onClick={async () => {
